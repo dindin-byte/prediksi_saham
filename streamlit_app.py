@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
+from io import BytesIO
 
 # Tampilkan judul
 st.title('Aplikasi Prediksi Saham')
@@ -27,7 +28,12 @@ for stock, data in data_dict.items():
     ax.set_xlabel('Date')
     ax.set_ylabel('Price')
     ax.legend()
-    st.pyplot(fig)
+
+    # Convert Matplotlib figure to PNG image
+    buf = BytesIO()
+    fig.savefig(buf, format='png')
+    buf.seek(0)
+    st.image(buf)
 
 # Menampilkan data aktual dan prediksi
 st.subheader('Data Aktual dan Prediksi')
