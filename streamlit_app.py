@@ -1,37 +1,72 @@
-import streamlit as st
+import numpy as np
 import pandas as pd
-import plotly.express as px
-pip install streamlit pandas plotly
+import yfinance as yf
+from sklearn.preprocessing import MinMaxScaler
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense, LSTM
+import streamlit as st
 
-# Tampilkan judul
-st.title('Aplikasi Prediksi Saham')
+st.title('Aplikasi Prediksi Saham Menggunakan LSTM')
 
-# Menampilkan data saham
+# Mendapatkan data saham
+ticker = st.text_input("Masukkan simbol saham (contoh: AAPL untuk Apple):")
+data = yf.download(ticker, start="2010-01-01", end="2023-10-01")
+
+# Menampilkan data
 st.subheader('Data Saham')
-st.write(df)
+st.write(data)
 
-# Menampilkan grafik prediksi
-for stock, data in data_dict.items():
-    last_date = data.index[-1]
-    future_dates = pd.date_range(start=last_date, periods=len(future_predictions[stock]) + 1, freq='B')[1:]
-    future_data = pd.Series(future_predictions[stock], index=future_dates)
+# Memproses data
+data = data['Close']
+dataset = data.values.reshape(-1, 1)
+scaler = MinMaxScaler(feature_range=(0, 1))
+dataset = scaler.fit_transform(dataset)
 
-    fig = px.line(data, x=data.index, y=data['Close'], title=f'{stock} Actual')
-    fig.add_scatter(x=future_data.index, y=future_data.values, mode='lines', name=f'{stock} Future Prediction')
-    
-    if future_data[-1] > future_data[-2]:
-        fig.add_annotation(x=future_data.index[-1], y=future_data.values[-1], text='↑', showarrow=True, arrowhead=2, arrowsize=1, arrowwidth=2)
-    else:
-        fig.add_annotation(x=future_data.index[-1], y=future_data.values[-1], text='↓', showarrow=True, arrowhead=2, arrowsize=1, arrowwidth=2)
+# Membagi data menjadi data latih dan data uji
+train_size = int(len(dataset) * 0.8)
+test_size = len(dataset) - train_size
+train_data, test_data = dataset[0:train_size, :], dataset[train_size:len(dataset), :]
 
-    st.plotly_chart(fig)
+# Membuat dataset untuk LSTM
+def create_dataset(dataset, time_step=1):
+    data_x, data_y = [], []
+    for i in range(len(dataset) - time_step - 1):
+        a = dataset[i:(i + time_step), 0]
+        data_x.append(a)
+        data_y.append(dataset[i + time_step, 0])
+    return np.array(data_x), np.array(data_y)
 
-# Menampilkan data aktual dan prediksi
-st.subheader('Data Aktual dan Prediksi')
-for stock, data in data_dict.items():
-    last_date = data.index[-1]
-    future_dates = pd.date_range(start=last_date, periods=len(future_predictions[stock]) + 1, freq='B')[1:]
-    future_data = pd.Series(future_predictions[stock], index=future_dates)
-    combined_data = pd.concat([data, future_data], axis=1)
-    st.write(f'\nData aktual dan prediksi untuk {stock}:')
-    st.write(combined_data)
+time_step = 100
+x_train, y_train = create_dataset(train_data, time_step)
+x_test, y_test = create_dataset(test_data, time_step)
+
+# Reshape data ke bentuk yang dapat diterima oleh LSTM
+x_train = x_train.reshape(x_train.shape[0], x_train.shape[1], 1)
+x_test = x_test.reshape(x_test.shape[0], x_test.shape[1], 1)
+
+# Membangun model LSTM
+model = Sequential()
+model.add(LSTM(units=50, return_sequences=True, input_shape=(x_train.shape[1], 1)))
+model.add(LSTM(units=50, return_sequences=True))
+model.add(LSTM(units=50))
+model.add(Dense(units=1))
+model.compile(optimizer='adam', loss='mean_squared_error')
+model.fit(x_train, y_train, epochs=100, batch_size=64)
+
+# Melakukan prediksi
+train_predict = model.predict(x_train)
+test_predict = model.predict(x_test)
+
+# Mengubah data kebentuk awal
+train_predict = scaler.inverse_transform(train_predict)
+test_predict = scaler.inverse_transform(test_predict)
+
+# Plot hasil prediksi
+st.subheader('Hasil Prediksi Saham')
+st.line_chart(data)
+
+# Menampilkan prediksi pada data uji
+st.subheader('Prediksi pada Data Uji')
+test_data = data[len(data) - len(test_data):]
+test_data['Predictions'] = test_predict
+st.line_chart(test_data[['Close', 'Predictions']])
