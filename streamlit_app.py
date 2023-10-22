@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
-from io import BytesIO
+import plotly.express as px
 
 # Tampilkan judul
 st.title('Aplikasi Prediksi Saham')
@@ -10,30 +9,21 @@ st.title('Aplikasi Prediksi Saham')
 st.subheader('Data Saham')
 st.write(df)
 
-# Membuat grafik prediksi
+# Menampilkan grafik prediksi
 for stock, data in data_dict.items():
     last_date = data.index[-1]
     future_dates = pd.date_range(start=last_date, periods=len(future_predictions[stock]) + 1, freq='B')[1:]
     future_data = pd.Series(future_predictions[stock], index=future_dates)
-    fig, ax = plt.subplots()
-    ax.plot(data.index, data['Close'], label=f'{stock} Actual')
-    ax.plot(future_data.index, future_data, label=f'{stock} Future Prediction')
+
+    fig = px.line(data, x=data.index, y=data['Close'], title=f'{stock} Actual')
+    fig.add_scatter(x=future_data.index, y=future_data.values, mode='lines', name=f'{stock} Future Prediction')
     
     if future_data[-1] > future_data[-2]:
-        ax.annotate('↑', (future_data.index[-1], future_data.values[-1]), color='g', fontsize=30, ha='center', va='center')
+        fig.add_annotation(x=future_data.index[-1], y=future_data.values[-1], text='↑', showarrow=True, arrowhead=2, arrowsize=1, arrowwidth=2)
     else:
-        ax.annotate('↓', (future_data.index[-1], future_data.values[-1]), color='r', fontsize=30, ha='center', va='center')
+        fig.add_annotation(x=future_data.index[-1], y=future_data.values[-1], text='↓', showarrow=True, arrowhead=2, arrowsize=1, arrowwidth=2)
 
-    ax.set_title('Predictions for the Future')
-    ax.set_xlabel('Date')
-    ax.set_ylabel('Price')
-    ax.legend()
-
-    # Convert Matplotlib figure to PNG image
-    buf = BytesIO()
-    fig.savefig(buf, format='png')
-    buf.seek(0)
-    st.image(buf)
+    st.plotly_chart(fig)
 
 # Menampilkan data aktual dan prediksi
 st.subheader('Data Aktual dan Prediksi')
