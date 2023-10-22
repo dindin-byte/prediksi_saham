@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+pip install streamlit pandas plotly
 
 # Tampilkan judul
 st.title('Aplikasi Prediksi Saham')
